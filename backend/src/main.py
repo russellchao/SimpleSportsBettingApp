@@ -94,6 +94,7 @@ def place_bet(bet: BetCreate, db: Session = Depends(get_db)):
     return new_bet
 
 
+
 # Background task to update scores
 async def update_game_scores():
     db = SessionLocal()
@@ -102,14 +103,23 @@ async def update_game_scores():
             games = db.query(Game).filter(Game.status == "in progress").all()
             for game in games:
                 # Randomly increment scores
-                game.score_team_1 += random.randint(0, 2)
-                game.score_team_2 += random.randint(0, 2)
+                score_team_1_increment = random.choice([3, 7])
+                score_team_2_increment = random.choice([3, 7])
+                game.score_team_1 += score_team_1_increment
+                game.score_team_2 += score_team_2_increment
+
+                # Debugging output to check if scores are updating
+                print(f"Updating game {game.id}: Team 1 score += {score_team_1_increment}, Team 2 score += {score_team_2_increment}")
+                print(f"New scores - Team 1: {game.score_team_1}, Team 2: {game.score_team_2}")
 
                 # Check if the game should end
                 if game.score_team_1 >= 20 or game.score_team_2 >= 20:  # End threshold
                     game.status = "finished"
                     game.result = "team_1" if game.score_team_1 > game.score_team_2 else "team_2"
+                    print(f"Game {game.id} finished! Result: {game.result}")
+                    
                 
+                # Commit updates to the database
                 db.commit()
             await asyncio.sleep(5)  # Update scores every 5 seconds
     finally:
@@ -120,7 +130,7 @@ async def update_game_scores():
 async def startup_event():
     # Start background task on server startup
     asyncio.create_task(update_game_scores())
-
+    
 
 # WebSocket connection for live updates
 @app.websocket("/game/{game_id}/ws")
