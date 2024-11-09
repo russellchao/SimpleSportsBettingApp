@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, WebSocket
+from fastapi import FastAPI, Depends, HTTPException, WebSocket, BackgroundTasks
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -6,6 +6,7 @@ from models import User, Game, Bet, Base
 from database import SessionLocal, engine
 from pydantic import BaseModel
 import asyncio
+import random
 
 # Initialize the database
 Base.metadata.create_all(bind=engine)
@@ -93,13 +94,58 @@ def place_bet(bet: BetCreate, db: Session = Depends(get_db)):
     return new_bet
 
 
+# Background task to update scores
+async def update_game_scores():
+    db = SessionLocal()
+    try:
+        while True:
+            games = db.query(Game).filter(Game.status == "in progress").all()
+            for game in games:
+                # Randomly increment scores
+                game.score_team_1 += random.randint(0, 2)
+                game.score_team_2 += random.randint(0, 2)
+
+                # Check if the game should end
+                if game.score_team_1 >= 20 or game.score_team_2 >= 20:  # End threshold
+                    game.status = "finished"
+                    game.result = "team_1" if game.score_team_1 > game.score_team_2 else "team_2"
+                
+                db.commit()
+            await asyncio.sleep(5)  # Update scores every 5 seconds
+    finally:
+        db.close()
+
+
+@app.on_event("startup")
+async def startup_event():
+    # Start background task on server startup
+    asyncio.create_task(update_game_scores())
+
 
 # WebSocket connection for live updates
 @app.websocket("/game/{game_id}/ws")
 async def websocket_endpoint(websocket: WebSocket, game_id: int):
     await websocket.accept()
-    while True:
-        # In real scenario, you'd update based on actual game data
-        # Here, we’ll simulate updates
-        await asyncio.sleep(5)  # Wait for 5 seconds
-        await websocket.send_text(f"Game {game_id} updated score")  # Example update
+    db = SessionLocal()
+    try:
+        while True:
+            game = db.query(Game).filter(Game.id == game_id).first()
+            if game:
+                # Send game update to client
+                message = {
+                    "team_1": game.team_1,
+                    "team_2": game.team_2,
+                    "score_team_1": game.score_team_1,
+                    "score_team_2": game.score_team_2,
+                    "status": game.status,
+                    "result": game.result,
+                }
+                await websocket.send_json(message)
+                
+                # Close WebSocket if game is finished
+                if game.status == "finished":
+                    break
+                
+            await asyncio.sleep(5)  # Send updates every 5 seconds
+    finally:
+        db.close()
