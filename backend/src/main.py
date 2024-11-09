@@ -1,4 +1,3 @@
-# main.py
 from fastapi import FastAPI, Depends, HTTPException, WebSocket
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -96,7 +95,7 @@ def place_bet(bet: BetCreate, db: Session = Depends(get_db)):
 
 
 # WebSocket connection for live updates
-@app.websocket("/ws/game/{game_id}")
+@app.websocket("/game/{game_id}/ws")
 async def websocket_endpoint(websocket: WebSocket, game_id: int):
     await websocket.accept()
     while True:
