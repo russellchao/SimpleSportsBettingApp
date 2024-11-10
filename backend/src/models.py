@@ -19,8 +19,8 @@ class Game(Base):
     id = Column(Integer, primary_key=True, index=True)
     team_1 = Column(String)
     team_2 = Column(String)
-    score_team_1 = Column(Integer, default=5) 
-    score_team_2 = Column(Integer, default=5)
+    score_team_1 = Column(Integer, default=3) 
+    score_team_2 = Column(Integer, default=3)
     status = Column(String, default="in_progress")
     start_time = Column(DateTime, default=datetime.utcnow)
     result = Column(String, nullable=True)  # "team_1", "team_2", or None if undecided

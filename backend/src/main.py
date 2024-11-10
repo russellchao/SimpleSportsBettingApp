@@ -7,6 +7,8 @@ from database import SessionLocal, engine
 from pydantic import BaseModel
 import asyncio
 import random
+import contextlib 
+
 
 # Initialize the database
 Base.metadata.create_all(bind=engine)
@@ -103,8 +105,8 @@ async def update_game_scores():
             games = db.query(Game).filter(Game.status == "in progress").all()
             for game in games:
                 # Randomly increment scores
-                score_team_1_increment = random.choice([3, 7])
-                score_team_2_increment = random.choice([3, 7])
+                score_team_1_increment = 7
+                score_team_2_increment = 7
                 game.score_team_1 += score_team_1_increment
                 game.score_team_2 += score_team_2_increment
 
@@ -126,11 +128,34 @@ async def update_game_scores():
         db.close()
 
 
-@app.on_event("startup")
+
+# @app.post("/test-update-game/{game_id}")
+# def test_update_game_score(game_id: int, db: Session = Depends(get_db)):
+#     # Find the game
+#     game = db.query(Game).filter(Game.id == game_id).first()
+#     if not game:
+#         return {"error": "Game not found"}
+
+#     # Manually update the score
+#     game.score_team_1 += 1
+#     game.score_team_2 += 1
+#     db.commit()  # Commit the change
+
+#     # Return the updated game data
+#     return {
+#         "id": game.id,
+#         "team_1_score": game.score_team_1,
+#         "team_2_score": game.score_team_2,
+#         "status": game.status
+#     }
+
+
+
+@app.websocket("/startup")
 async def startup_event():
     # Start background task on server startup
     asyncio.create_task(update_game_scores())
-    
+
 
 # WebSocket connection for live updates
 @app.websocket("/game/{game_id}/ws")
@@ -159,3 +184,11 @@ async def websocket_endpoint(websocket: WebSocket, game_id: int):
             await asyncio.sleep(5)  # Send updates every 5 seconds
     finally:
         db.close()
+
+
+
+# @app.get("/games/in-progress")
+# def get_in_progress_games(db: Session = Depends(get_db)):
+#     games = db.query(Game).filter(Game.status == "in progress").all()
+#     return [{"id": game.id, "team_1_score": game.score_team_1, "team_2_score": game.score_team_2, "status": game.status} for game in games]
+
